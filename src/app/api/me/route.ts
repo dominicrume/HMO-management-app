@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { isManagerWhitelisted } from '@/lib/security/managers';
 
 // GET /api/me
 // Returns the current user's staff profile from the users table.
@@ -57,6 +58,18 @@ export async function GET() {
 
     if (!dbUser) {
       return NextResponse.json({ error: 'NO_PROFILE', auth_id: user.id, email: user.email }, { status: 404 });
+    }
+
+    // Self-heal: whitelisted admin emails are always Managers. If the stored
+    // role has drifted, repair it so every downstream permission check agrees.
+    if (isManagerWhitelisted(dbUser.email) && dbUser.role !== 'Manager') {
+      const { data: repaired, error: roleErr } = await svc
+        .from('users')
+        .update({ role: 'Manager' })
+        .eq('id', dbUser.id)
+        .select()
+        .single();
+      if (!roleErr && repaired) dbUser = repaired;
     }
 
     return NextResponse.json({ user: dbUser });

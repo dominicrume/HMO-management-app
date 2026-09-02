@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { isManagerWhitelisted } from '@/lib/security/managers';
 
 // POST /api/setup
 // Creates the Manager users row for the current auth user if it doesn't exist.
@@ -54,8 +55,7 @@ export async function POST() {
       .select('*', { count: 'exact', head: true })
       .eq('role', 'Manager');
 
-    const whitelist = ['dominicrume@gmail.com', 'orumedominic@gmail.com'];
-    const isWhitelisted = user.email && whitelist.includes(user.email.toLowerCase());
+    const isWhitelisted = isManagerWhitelisted(user.email);
 
     if ((managerCount ?? 0) > 0 && !isWhitelisted) {
       return NextResponse.json(
