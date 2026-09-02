@@ -24,7 +24,7 @@ import PrintView        from '@/components/views/PrintView';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
 import type { DbTenant, DbUser } from '@/types/database';
 
-// ── Views that use the full-width layout (no forms panel) ─────────────────────
+// ── Views that use the full-width layout (no forms panel) ──────────────────
 // NOTE: 'ai-brain' is handled by its own case in renderCenter() below
 const FULL_WIDTH_VIEWS = new Set(['dashboard', 'tenants', 'sessions', 'ledger', 'risk', 'audit', 'print', 'settings']);
 
@@ -156,7 +156,7 @@ export default function DashboardPage() {
     return () => { supabase.removeChannel(channel); };
   }, [supabase, loadData]);
 
-  // ── Print Lifecycle listener ───────────────────────────────────────────────
+  // ── Print Lifecycle listener ────────────────────────────────────────
   useEffect(() => {
     const handleAfterPrint = () => {
       setIsPrintingAll(false);
@@ -167,7 +167,7 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // ── Navigation handler ─────────────────────────────────────────────────────
+  // ── Navigation handler ────────────────────────────────────────────────
 
   const handleNavigate = useCallback((id: string) => {
     if (id === 'intake') {
@@ -202,12 +202,13 @@ export default function DashboardPage() {
     }
   }, [router, activeTenant]);
 
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.error('Sign out error:', e);
-    }
+  const handleSignOut = () => {
+    // Local scope clears the browser session synchronously — no server
+    // round-trip — so the redirect fires immediately instead of waiting
+    // seconds for Supabase's global sign-out call. The server-side session
+    // is invalidated in the background; if it fails, the token expires soon.
+    void supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    void supabase.auth.signOut().catch(() => {});
     window.location.href = '/login';
   };
 
@@ -218,17 +219,18 @@ export default function DashboardPage() {
     }, 800);
   };
 
-  // ── Filtered tenant list ───────────────────────────────────────────────────
+  // ── Filtered tenant list ─────────────────────────────────────────────
 
+  const searchQ = tenantSearch.toLowerCase();
   const filteredTenants = tenants.filter((t) =>
-    t.full_name.toLowerCase().includes(tenantSearch.toLowerCase()) ||
-    t.room_number.toLowerCase().includes(tenantSearch.toLowerCase())
+    (t.full_name ?? '').toLowerCase().includes(searchQ) ||
+    (t.room_number ?? '').toLowerCase().includes(searchQ)
   );
 
   const activeCount = tenants.filter((t) => t.status === 'active').length;
   const isFullWidth = FULL_WIDTH_VIEWS.has(activeNav);
 
-  // ── Center view renderer ───────────────────────────────────────────────────
+  // ── Center view renderer ─────────────────────────────────────────────
 
   const ViewFallback = () => (
     <div className="flex-1 flex items-center justify-center">
@@ -444,7 +446,7 @@ export default function DashboardPage() {
 
       <div className="flex flex-col flex-1 overflow-hidden">
 
-        {/* ── Dark system status bar — always visible ───────────────────── */}
+        {/* ── Dark system status bar — always visible ───────────────── */}
         <div className="no-print bg-navy flex items-center justify-between px-5 py-1.5 flex-shrink-0">
           <span className="text-xxs font-mono font-semibold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
@@ -458,7 +460,7 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        {/* ── Top header — V2.5.0 style ─────────────────────────────────── */}
+        {/* ── Top header — V2.5.0 style ────────────────────────────── */}
         <header className="no-print h-12 bg-white border-b border-slate-200 flex items-center px-3 sm:px-4 gap-2 sm:gap-3 z-10 flex-shrink-0">
 
           {/* Mobile hamburger */}
@@ -572,10 +574,10 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* ── Three-panel body ──────────────────────────────────────────────── */}
+        {/* ── Three-panel body ─────────────────────────────────────────── */}
         <div className="flex flex-1 overflow-hidden">
 
-          {/* ── Tenant list — always visible ─────────────────────────────────── */}
+          {/* ── Tenant list — always visible ────────────────────────────── */}
           <aside className={`
             no-print bg-white border-r border-slate-200 flex flex-col overflow-hidden
             fixed inset-y-0 left-0 z-30 w-72 transition-transform duration-300
@@ -658,7 +660,10 @@ export default function DashboardPage() {
                   </li>
                 ) : filteredTenants.map((tenant) => {
                   const isActive  = tenant.id === activeTenant?.id;
-                  const initials  = tenant.full_name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
+                  const nameStr   = tenant.full_name ?? '';
+                  const initials  = nameStr
+                    ? nameStr.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
+                    : '?';
                   const isManager = currentUser?.role === 'Manager';
 
                   return (
@@ -756,10 +761,10 @@ export default function DashboardPage() {
             onClick={() => setTenantPanelOpen(false)}
           />
 
-          {/* ── Main content area — switches by activeNav ──────────────────── */}
+          {/* ── Main content area — switches by activeNav ──────────────── */}
           {renderCenter()}
 
-          {/* ── Hidden Print All Forms View ────────────────────────────────── */}
+          {/* ── Hidden Print All Forms View ────────────────────────── */}
           {isPrintingAll && activeTenant && (
             <div className="hidden print:block absolute inset-0 bg-white z-50 print-all-overlay">
               <PrintAllForms tenant={activeTenant} brand={activeBrand} />
@@ -769,7 +774,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Admin Record Modal — Manager only ─────────────────────────────── */}
+      {/* ── Admin Record Modal — Manager only ───────────────────────── */}
       {adminModal && (
         <AdminRecordModal
           tenant={adminModal}

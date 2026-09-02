@@ -30,7 +30,7 @@ function SignupInner() {
     }
 
     const supabase = createBrowserClient();
-    const { data, error: authError } = await supabase.auth.signUp({
+    const { error: authError } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
       options: {
@@ -41,7 +41,19 @@ function SignupInner() {
     });
 
     if (authError) {
-      setError(authError.message);
+      const msg = (authError.message || 'Signup failed.').toLowerCase();
+      if (msg.includes('signup') && msg.includes('disabled')) {
+        setError(
+          'New sign-ups are disabled on this Supabase project. A Manager must invite you — ' +
+          'ask them to add your account via the admin console.'
+        );
+      } else if (msg.includes('registered') || msg.includes('already')) {
+        setError('That email already has an account. Try signing in instead.');
+      } else if (msg.includes('password')) {
+        setError(authError.message + ' (Passwords must be at least 6 characters.)');
+      } else {
+        setError(authError.message);
+      }
       setLoading(false);
       return;
     }
@@ -159,6 +171,12 @@ function SignupInner() {
             >
               {loading ? 'Creating account…' : 'Sign Up'}
             </button>
+
+            <p className="text-xxs text-slate-500 text-center leading-relaxed">
+              Staff accounts are invitation-only. Only pre-authorised admin
+              emails can bootstrap themselves; everyone else needs a Manager
+              to create their account.
+            </p>
           </form>
         </div>
 
